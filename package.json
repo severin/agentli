@@ -1,0 +1,15 @@
+{
+  "name": "agent-presi",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start:01": "node 01-chat.js",
+    "start:02": "node 02-system-prompts.js"
+  },
+  "dependencies": {
+    "@ai-sdk/openai-compatible": "^3.0.44",
+    "ai": "^7.0.93"
+  }
+}
