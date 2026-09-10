@@ -53,62 +53,63 @@ async function complete(messages) {
   return text
 }
 
-function extractToolCall(text) {
-  let toolCall = null
+function extractActionCall(text) {
+  let actionCall = null
   try {
     const payload = JSON.parse(text)
-    if (payload.tool && payload.tool_input) {
-      toolCall = {
-        tool: payload.tool,
-        toolInput: payload.tool_input,
+    if (payload.action && payload.action_input) {
+      actionCall = {
+        action: payload.action,
+        actionInput: payload.action_input,
       }
     }
   } catch (error) {}
-  return toolCall
+  return actionCall
 }
 
-function executeToolCall(toolCall) {
-  const { tool, toolInput } = toolCall
-  let toolOutput = ''
-  let toolSuccess = false
+function executeActionCall(actionCall) {
+  const { action, actionInput } = actionCall
+  let actionOutput = ''
+  let actionSuccess = false
 
-  if (tool === 'bash') {
+  if (action === 'shell') {
     try {
-      toolOutput = execSync(toolInput.command, { encoding: 'utf8' })
-      toolSuccess = true
+      actionOutput = execSync(actionInput.command, { encoding: 'utf8' })
+      actionSuccess = true
     } catch (error) {
-      toolOutput = error.message
+      actionOutput = error.message
     }
   } else {
-    toolOutput = `Unknown tool: ${tool}`
+    actionOutput = `Unknown action: ${action}`
   }
 
-  return { tool, toolInput, toolSuccess, toolOutput }
+  return { action, actionInput, actionSuccess, actionOutput }
 }
 
 // Low-level message history array
 const messages = []
 
 // Add a system prompt
-// This also describes available tools
+// This also describes available actions
 const SYSTEM_PROMPT = `
 You are a coding assistant. You interact with the user by asking them questions
-and providing answers. You might also use tools (defined below).
+and providing answers and/or executing "actions" (defined below).
 
 Any question that is not related to coding should be politely rejected.
 
-Tools:
-You can invoke a tool by sending a message with the following properties:
+Actions:
+Forget everything you know about actions and action calling. You should only rely on the instructions provided here.
+You can invoke an action by sending a message with the following properties:
 - The message must be valid JSON. There must be no decoration like "\`\`\`json" or "\`\`\`" around the JSON. The message must be a single JSON object
-- The message must have a "tool" property with the name of the tool to invoke
-- The message must have a "tool_input" property with the parameters for the tool call
+- The message must have a "action" property with the name of the action to invoke
+- The message must have a "action_input" property with the parameters for the action call
 
-As a response to a tool call message you will receive a message with the following properties:
+As a response to an action call message you will receive a message with the following properties:
 - The message will be valid JSON
-- The message will have a "tool_success" property indicating whether the tool call was successful
+- The message will have a "action_success" property indicating whether the action call was successful
 
-Available tools:
-- "bash": Executes a bash command on the local machine. The "tool_input" property must be an objectwith a "command" property containing the command to execute. The response will contain a "tool_output" property with the output of the command. Use this tool for any action you want to take, e.g. running a script but also manipulating files (via echo, cat etc.). Do one thing at a time, i.e. do not chain multiple commands in one tool call if not necessary. If you need to run multiple commands, do them in separate tool calls.
+Available actions:
+- "shell": Executes a shell command on the local machine. The "action_input" property must be an objectwith a "command" property containing the command to execute. The response will contain a "action_output" property with the output of the command. Use this action for any operation you want to take, e.g. running a script but also manipulating files (via echo, cat etc.). Do one thing at a time, i.e. do not chain multiple commands in one action call if not necessary. If you need to run multiple commands, do them in separate action calls.
 `
 messages.push({ role: 'system', content: SYSTEM_PROMPT })
 
@@ -135,21 +136,21 @@ while (true) {
     // Ask LLM to complete
     const text = await complete(messages)
 
-    // Check if the response is a tool call
-    const toolCall = extractToolCall(text)
+    // Check if the response is a action call
+    const actionCall = extractActionCall(text)
 
-    if (toolCall) {
-      // Execute the tool call
-      const { tool, toolInput, toolSuccess, toolOutput } = executeToolCall(toolCall)
+    if (actionCall) {
+      // Execute the action call
+      const { action, actionInput, actionSuccess, actionOutput } = executeActionCall(actionCall)
       console.log(
-        `-----\nTool call: ${tool}\nInput: ${JSON.stringify(toolInput)}\nOutput: ${toolOutput}\nSuccess: ${toolSuccess}\n-----`,
+        `-----\nAction call: ${action}\nInput: ${JSON.stringify(actionInput)}\nOutput: ${actionOutput}\nSuccess: ${actionSuccess}\n-----`,
       )
 
-      // Append tool call and tool call response to conversation history
+      // Append action call and action call response to conversation history
       messages.push({ role: 'assistant', content: text })
       messages.push({
         role: 'user',
-        content: JSON.stringify({ tool_success: toolSuccess, tool_output: toolOutput }),
+        content: JSON.stringify({ action_success: actionSuccess, action_output: actionOutput }),
       })
     } else {
       // Print response
